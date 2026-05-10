@@ -16,26 +16,33 @@ $mois   = $_GET['mois']   ?? '';
 $trim   = $_GET['trimestre'] ?? '';
 
 [$where, $params] = build_dossier_where();
-$where .= " AND strftime('%Y', d.date_ouverture) = ?";
+
+$yr = sql_year('d.date_ouverture');
+$where .= " AND $yr = ?";
 $params[] = $annee;
 
 if ($mois) {
-    $where .= " AND strftime('%m', d.date_ouverture) = ?";
-    $params[] = str_pad($mois, 2, '0', STR_PAD_LEFT);
+    $mo = sql_month('d.date_ouverture');
+    $where .= " AND $mo = ?";
+    $params[] = (int)$mois;
 }
 if ($trim) {
+    $mo    = sql_month('d.date_ouverture');
     $debut = ((int)$trim - 1) * 3 + 1;
     $fin   = (int)$trim * 3;
-    $where .= " AND CAST(strftime('%m', d.date_ouverture) AS INTEGER) BETWEEN ? AND ?";
+    $where .= " AND $mo BETWEEN ? AND ?";
     $params[] = $debut;
     $params[] = $fin;
 }
 
+$agentConcat = sql_concat('u.nom', 'u.prenom');
+$chefConcat  = sql_concat('cb.nom', 'cb.prenom');
+
 $stmt = $db->prepare("
     SELECT d.numero_dossier, c.nom AS contribuable, c.nif, c.type_entreprise, c.secteur_activite,
            d.type_controle, d.statut, d.date_ouverture, d.date_cloture,
-           u.nom || ' ' || u.prenom AS agent,
-           cb.nom || ' ' || cb.prenom AS chef_brigade,
+           $agentConcat AS agent,
+           $chefConcat AS chef_brigade,
            b.nom AS brigade,
            (SELECT COUNT(*) FROM etapes e WHERE e.dossier_id=d.id AND e.statut='retard') AS retards
     FROM dossiers d

@@ -60,3 +60,33 @@ function next_numero_dossier(PDO $db, string $date): string {
     $seq  = $last ? (int)substr($last, strrpos($last, '-') + 1) + 1 : 1;
     return sprintf('DCF-%s-%03d', $year, $seq);
 }
+
+// SQL dialect helpers — switch between SQLite and MySQL syntax
+
+function sql_concat(string ...$parts): string {
+    if (USE_SQLITE) return implode(" || ' ' || ", $parts);
+    $args = [];
+    $first = true;
+    foreach ($parts as $p) {
+        if (!$first) $args[] = "' '";
+        $args[] = $p;
+        $first = false;
+    }
+    return 'CONCAT(' . implode(', ', $args) . ')';
+}
+
+function sql_year(string $col): string {
+    return USE_SQLITE ? "strftime('%Y', $col)" : "YEAR($col)";
+}
+
+function sql_month(string $col): string {
+    return USE_SQLITE ? "CAST(strftime('%m', $col) AS INTEGER)" : "MONTH($col)";
+}
+
+function sql_yearmonth(string $col): string {
+    return USE_SQLITE ? "strftime('%Y-%m', $col)" : "DATE_FORMAT($col, '%Y-%m')";
+}
+
+function sql_date_sub_months(int $n): string {
+    return USE_SQLITE ? "date('now', '-$n months')" : "DATE_SUB(CURDATE(), INTERVAL $n MONTH)";
+}

@@ -30,11 +30,13 @@ if ($method === 'GET' && !$id) {
     if ($type)   { $where .= ' AND d.type_controle = ?'; $params[] = $type; }
     if ($agentId){ $where .= ' AND d.agent_id = ?'; $params[] = $agentId; }
 
+    $agentConcat = sql_concat('u.nom', 'u.prenom');
+    $chefConcat  = sql_concat('cb.nom', 'cb.prenom');
     $stmt = $db->prepare("
         SELECT d.*,
                c.nom AS contribuable_nom, c.nif, c.type_entreprise, c.secteur_activite,
-               u.nom || ' ' || u.prenom AS agent_nom,
-               cb.nom || ' ' || cb.prenom AS chef_brigade_nom,
+               $agentConcat AS agent_nom,
+               $chefConcat AS chef_brigade_nom,
                b.nom AS brigade_nom,
                (SELECT COUNT(*) FROM etapes e WHERE e.dossier_id = d.id) AS nb_etapes,
                (SELECT COUNT(*) FROM etapes e WHERE e.dossier_id = d.id AND e.statut = 'retard') AS nb_retards
@@ -52,11 +54,13 @@ if ($method === 'GET' && !$id) {
 
 // GET ONE
 if ($method === 'GET' && $id) {
+    $agentConcat = sql_concat('u.nom', 'u.prenom');
+    $chefConcat  = sql_concat('cb.nom', 'cb.prenom');
     $stmt = $db->prepare("
         SELECT d.*,
                c.nom AS contribuable_nom, c.nif, c.type_entreprise, c.adresse, c.secteur_activite,
-               u.nom || ' ' || u.prenom AS agent_nom, u.email AS agent_email,
-               cb.nom || ' ' || cb.prenom AS chef_brigade_nom,
+               $agentConcat AS agent_nom, u.email AS agent_email,
+               $chefConcat AS chef_brigade_nom,
                b.nom AS brigade_nom
         FROM dossiers d
         JOIN contribuables c ON d.contribuable_id = c.id

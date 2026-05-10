@@ -15,8 +15,9 @@ $action = $_GET['action'] ?? 'dashboard';
 
 if ($action === 'audit') {
     Auth::requireRoles('directeur', 'sous_directeur');
+    $concat = sql_concat('u.nom', 'u.prenom');
     $logs = $db->query("
-        SELECT al.*, u.nom || ' ' || u.prenom AS utilisateur
+        SELECT al.*, $concat AS utilisateur
         FROM audit_logs al LEFT JOIN users u ON al.user_id=u.id
         ORDER BY al.created_at DESC LIMIT 200
     ")->fetchAll();
@@ -43,15 +44,18 @@ $fetch = function(string $sql, array $p = []) use ($db) {
 
 $parType = $fetch("SELECT type_controle, COUNT(*) AS cnt FROM dossiers d WHERE $where GROUP BY type_controle", $params);
 
+$agentConcat = sql_concat('u.nom', 'u.prenom');
 $parAgent = $fetch("
-    SELECT u.nom || ' ' || u.prenom AS agent, COUNT(d.id) AS cnt
+    SELECT $agentConcat AS agent, COUNT(d.id) AS cnt
     FROM dossiers d JOIN users u ON d.agent_id=u.id
     WHERE $where GROUP BY d.agent_id ORDER BY cnt DESC LIMIT 10
 ", $params);
 
+$ym      = sql_yearmonth('d.date_ouverture');
+$dateSub = sql_date_sub_months(12);
 $parMois = $fetch("
-    SELECT strftime('%Y-%m', d.date_ouverture) AS mois, COUNT(*) AS cnt
-    FROM dossiers d WHERE $where AND d.date_ouverture >= date('now','-12 months')
+    SELECT $ym AS mois, COUNT(*) AS cnt
+    FROM dossiers d WHERE $where AND d.date_ouverture >= $dateSub
     GROUP BY mois ORDER BY mois ASC
 ", $params);
 
@@ -62,8 +66,9 @@ $retardsParEtape = $fetch("
     GROUP BY e.type_etape ORDER BY cnt DESC
 ", $params);
 
+$yr = sql_year('d.date_ouverture');
 $progression = $fetch("
-    SELECT strftime('%Y', d.date_ouverture) AS annee,
+    SELECT $yr AS annee,
            SUM(CASE WHEN d.statut='cloture' THEN 1 ELSE 0 END) AS clotures,
            SUM(CASE WHEN d.statut!='cloture' THEN 1 ELSE 0 END) AS en_cours,
            COUNT(*) AS total
