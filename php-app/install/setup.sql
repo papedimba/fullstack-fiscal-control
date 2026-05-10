@@ -101,7 +101,8 @@ CREATE TABLE IF NOT EXISTS `audit_logs` (
 --  Données initiales (mot de passe : Admin1234!)
 -- -------------------------------------------------------
 -- Hash bcrypt généré par PHP : password_hash('Admin1234!', PASSWORD_BCRYPT)
-SET @hash = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
+-- Hash bcrypt de 'Admin1234!' généré par password_hash('Admin1234!', PASSWORD_BCRYPT)
+SET @hash = '$2y$12$5LF1pwF/AquUXaH1GW4DuO8THrThwfGRQRQSI1mR3WMb4Qq.bAf9.';
 
 INSERT IGNORE INTO `brigades` (`id`,`nom`) VALUES (1,'Brigade A'),(2,'Brigade B'),(3,'Brigade C');
 
