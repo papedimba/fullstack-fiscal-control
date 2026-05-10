@@ -135,6 +135,7 @@ $isLoggedIn = $user !== null;
       $navItems = [
         ['dashboard',    'Tableau de Bord', 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
         ['dossiers',     'Dossiers',        'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z'],
+        ['contribuables','Contribuables',   'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'],
         ['procedures',   'Procédures',      'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'],
         ['alertes',      'Alertes',         'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'],
         ['statistiques', 'Statistiques',    'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'],
@@ -246,7 +247,7 @@ function nav(page,param=null) {
   document.querySelectorAll('.sidebar-link').forEach(e=>e.classList.remove('active'));
   const el=document.getElementById('nav-'+page); if(el)el.classList.add('active');
   spin();
-  ({dashboard,dossiers,procedures,alertes,statistiques,export:exportPage,utilisateurs,dossierDetail})[page]?.(param);
+  ({dashboard,dossiers,contribuables,procedures,alertes,statistiques,export:exportPage,utilisateurs,dossierDetail})[page]?.(param);
 }
 
 // ── Login ─────────────────────────────────────────────────────
@@ -370,6 +371,62 @@ async function submitDossier(e) {
   try {
     const r=await req('api/dossiers.php',{method:'POST',body:JSON.stringify(Object.fromEntries(fd))});
     cModal(); toast(`Dossier ${r.numero_dossier} créé`); nav('dossierDetail',r.id);
+  } catch(ex){ err.textContent=ex.message; err.classList.remove('hidden'); }
+}
+
+// ── CONTRIBUABLES ─────────────────────────────────────────────
+async function contribuables() {
+  const data = await req('api/contribuables.php');
+  const canEdit = ['directeur','sous_directeur','chef_brigade'].includes(APP.user.role);
+  pg(`<div class="space-y-5">
+    <div class="flex items-center justify-between">
+      <div><h1 class="text-2xl font-bold">Contribuables</h1><p class="text-gray-500 text-sm">${data.length} contribuable(s) enregistré(s)</p></div>
+      ${canEdit?`<button class="btn-primary flex items-center gap-2" onclick="showContribuableForm()"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Nouveau contribuable</button>`:''}
+    </div>
+    <div class="card p-0 overflow-hidden">
+      ${!data.length?'<p class="text-center text-gray-400 py-16">Aucun contribuable enregistré</p>':`
+      <div class="overflow-x-auto"><table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b"><tr>
+          ${['Nom / Raison sociale','NIF','Type','Secteur','Adresse',''].map(h=>`<th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">${h}</th>`).join('')}
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+        ${data.map(c=>`<tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 font-medium">${c.nom}</td>
+          <td class="px-4 py-3 font-mono text-gray-600 text-xs">${c.nif}</td>
+          <td class="px-4 py-3"><span class="badge bg-blue-50 text-blue-700">${c.type_entreprise}</span></td>
+          <td class="px-4 py-3 text-gray-500">${c.secteur_activite||'—'}</td>
+          <td class="px-4 py-3 text-gray-500 max-w-[200px] truncate">${c.adresse||'—'}</td>
+          <td class="px-4 py-3">${canEdit?`<button class="p-1.5 rounded hover:bg-gray-100 text-gray-500" onclick='showContribuableForm(${JSON.stringify(c)})' title="Modifier">✎</button>`:''}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table></div>`}
+    </div>
+  </div>`);
+}
+
+function showContribuableForm(c=null) {
+  const types=['SA','SARL','SAS','EURL','SNC','Entreprise individuelle'];
+  modal(`<div class="flex items-center justify-between p-6 border-b"><h2 class="text-lg font-semibold">${c?'Modifier':'Nouveau'} contribuable</h2><button onclick="cModal()" class="text-gray-400">✕</button></div>
+  <form onsubmit="submitContribuable(event,${c?c.id:'null'})" class="p-6 space-y-4">
+    <div><label class="label">Nom / Raison sociale *</label><input name="nom" class="input" value="${c?c.nom:''}" required placeholder="Ex: SOCIÉTÉ IVOIRIENNE DE TRANSIT SA"></div>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="label">NIF *</label><input name="nif" class="input" value="${c?c.nif:''}" required placeholder="CI-ABJ-2025-B-XXXXX" ${c?'readonly title="Le NIF ne peut pas être modifié"':''}></div>
+      <div><label class="label">Type d'entreprise *</label><select name="type_entreprise" class="input">${types.map(t=>`<option value="${t}" ${c&&c.type_entreprise===t?'selected':''}>${t}</option>`).join('')}</select></div>
+    </div>
+    <div><label class="label">Secteur d'activité</label><input name="secteur_activite" class="input" value="${c?c.secteur_activite||'':''}" placeholder="Ex: Transport & Logistique"></div>
+    <div><label class="label">Adresse</label><input name="adresse" class="input" value="${c?c.adresse||'':''}" placeholder="Ex: Abidjan, Plateau"></div>
+    <div id="cErr" class="hidden bg-red-50 text-red-700 text-sm px-3 py-2 rounded border border-red-200"></div>
+    <div class="flex gap-3"><button type="button" onclick="cModal()" class="btn-secondary flex-1">Annuler</button><button type="submit" class="btn-primary flex-1">${c?'Enregistrer':'Créer'}</button></div>
+  </form>`);
+}
+
+async function submitContribuable(e,id) {
+  e.preventDefault();
+  const fd=new FormData(e.target),err=document.getElementById('cErr');
+  try {
+    if(id) await req(`api/contribuables.php?id=${id}`,{method:'PUT',body:JSON.stringify(Object.fromEntries(fd))});
+    else   await req('api/contribuables.php',{method:'POST',body:JSON.stringify(Object.fromEntries(fd))});
+    cModal(); toast(id?'Contribuable modifié':'Contribuable créé'); nav('contribuables');
   } catch(ex){ err.textContent=ex.message; err.classList.remove('hidden'); }
 }
 

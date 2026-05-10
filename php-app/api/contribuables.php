@@ -27,8 +27,22 @@ if ($method === 'POST') {
 
     $stmt = $db->prepare('INSERT INTO contribuables (nom,nif,type_entreprise,adresse,secteur_activite) VALUES (?,?,?,?,?)');
     $stmt->execute([$body['nom'], $body['nif'], $body['type_entreprise'], $body['adresse'] ?? '', $body['secteur_activite'] ?? '']);
-    Auth::auditLog(Auth::userId(), 'CREATE', 'contribuables', (int)$db->lastInsertId(), "Création {$body['nom']}");
-    json_response(['id' => $db->lastInsertId()], 201);
+    $newId = (int)$db->lastInsertId();
+    Auth::auditLog(Auth::userId(), 'CREATE', 'contribuables', $newId, "Création {$body['nom']}");
+    json_response(['id' => $newId], 201);
+}
+
+if ($method === 'PUT') {
+    Auth::requireRoles('directeur', 'sous_directeur', 'chef_brigade');
+    $id = (int)($_GET['id'] ?? 0);
+    if (!$id) json_error('ID requis');
+    $body = request_body();
+    require_fields($body, 'nom', 'type_entreprise');
+
+    $db->prepare('UPDATE contribuables SET nom=?,type_entreprise=?,adresse=?,secteur_activite=? WHERE id=?')
+       ->execute([$body['nom'], $body['type_entreprise'], $body['adresse'] ?? '', $body['secteur_activite'] ?? '', $id]);
+    Auth::auditLog(Auth::userId(), 'UPDATE', 'contribuables', $id, "Modification {$body['nom']}");
+    json_response(['ok' => true]);
 }
 
 json_error('Méthode non autorisée', 405);
