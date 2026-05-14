@@ -85,6 +85,51 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   details     TEXT DEFAULT '',
   created_at  TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS commentaires (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  dossier_id  INTEGER NOT NULL REFERENCES dossiers(id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message     TEXT NOT NULL,
+  created_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS pieces_jointes (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  dossier_id    INTEGER NOT NULL REFERENCES dossiers(id) ON DELETE CASCADE,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+  nom_original  TEXT NOT NULL,
+  nom_stockage  TEXT NOT NULL,
+  mime_type     TEXT DEFAULT '',
+  taille        INTEGER DEFAULT 0,
+  created_at    TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS dossier_historique (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  dossier_id  INTEGER NOT NULL REFERENCES dossiers(id) ON DELETE CASCADE,
+  user_id     INTEGER DEFAULT NULL REFERENCES users(id) ON DELETE SET NULL,
+  action      TEXT NOT NULL,
+  details     TEXT DEFAULT '',
+  created_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  email       TEXT NOT NULL,
+  token       TEXT NOT NULL UNIQUE,
+  expires_at  TEXT NOT NULL,
+  used        INTEGER DEFAULT 0,
+  created_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS totp_secrets (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  secret      TEXT NOT NULL,
+  actif       INTEGER DEFAULT 0,
+  created_at  TEXT DEFAULT (datetime('now'))
+);
 SQL;
 
 foreach (explode(';', $tables) as $stmt) {

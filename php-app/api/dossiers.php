@@ -3,6 +3,13 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/functions.php';
 
+function historiqueLog(PDO $db, int $dossierId, int $userId, string $action, string $details = ''): void {
+    try {
+        $db->prepare('INSERT INTO dossier_historique (dossier_id, user_id, action, details) VALUES (?,?,?,?)')
+           ->execute([$dossierId, $userId, $action, $details]);
+    } catch (Exception) {}
+}
+
 Auth::start();
 Auth::check();
 
@@ -104,6 +111,7 @@ if ($method === 'POST' && !$id) {
     ]);
     $newId = $db->lastInsertId();
     Auth::auditLog(Auth::userId(), 'CREATE', 'dossiers', (int)$newId, "Création $numero");
+    historiqueLog($db, (int)$newId, Auth::userId(), 'Dossier créé', "Numéro : $numero");
     json_response(['id' => $newId, 'numero_dossier' => $numero], 201);
 }
 
@@ -127,6 +135,10 @@ if ($method === 'PUT' && $id) {
         $id,
     ]);
     Auth::auditLog(Auth::userId(), 'UPDATE', 'dossiers', $id, 'Mise à jour');
+    $details = '';
+    if (isset($body['statut']) && $body['statut'] !== $cur['statut'])
+        $details = "Statut : {$cur['statut']} → {$body['statut']}";
+    historiqueLog($db, $id, Auth::userId(), 'Dossier modifié', $details);
     json_response(['ok' => true]);
 }
 
@@ -135,7 +147,7 @@ if ($method === 'DELETE' && $id) {
     Auth::requireRoles('directeur', 'sous_directeur');
     $db->prepare('DELETE FROM dossiers WHERE id = ?')->execute([$id]);
     Auth::auditLog(Auth::userId(), 'DELETE', 'dossiers', $id, 'Suppression');
-    json_response(['ok' => true]);
+    json_response(['ok' => true]); // historique supprimé en cascade
 }
 
 json_error('Méthode non autorisée', 405);

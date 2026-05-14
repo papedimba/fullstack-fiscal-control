@@ -2,6 +2,26 @@
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/email.php';
+
+function etapeHistorique(PDO $db, int $dossierId, int $userId, string $action, string $details = ''): void {
+    try {
+        $db->prepare('INSERT INTO dossier_historique (dossier_id, user_id, action, details) VALUES (?,?,?,?)')
+           ->execute([$dossierId, $userId, $action, $details]);
+    } catch (Exception) {}
+}
+
+function notifyRetard(PDO $db, int $dossierId, string $typeEtape): void {
+    try {
+        $stmt = $db->prepare("
+            SELECT d.numero_dossier, u.email, u.nom, u.prenom
+            FROM dossiers d JOIN users u ON d.agent_id = u.id WHERE d.id = ?
+        ");
+        $stmt->execute([$dossierId]);
+        $row = $stmt->fetch();
+        if ($row) Mailer::sendRetardAlert($row['email'], $row['prenom'].' '.$row['nom'], $row['numero_dossier'], $typeEtape);
+    } catch (Exception) {}
+}
 
 Auth::start();
 Auth::check();
@@ -54,11 +74,12 @@ if ($method === 'POST' && $dossierId) {
 
     $stmt = $db->prepare('INSERT INTO etapes (dossier_id,type_etape,date_prevue,commentaire) VALUES (?,?,?,?)');
     $stmt->execute([$dossierId, $body['type_etape'], $body['date_prevue'] ?? null, $body['commentaire'] ?? '']);
+    $newId = (int)$db->lastInsertId();
 
-    // Passer le dossier en 'en_cours' s'il était 'ouvert'
     $db->prepare("UPDATE dossiers SET statut='en_cours' WHERE id=? AND statut='ouvert'")->execute([$dossierId]);
-    Auth::auditLog(Auth::userId(), 'CREATE', 'etapes', (int)$db->lastInsertId(), "Étape {$body['type_etape']}");
-    json_response(['id' => $db->lastInsertId()], 201);
+    Auth::auditLog(Auth::userId(), 'CREATE', 'etapes', $newId, "Étape {$body['type_etape']}");
+    etapeHistorique($db, $dossierId, Auth::userId(), 'Étape ajoutée', $body['type_etape']);
+    json_response(['id' => $newId], 201);
 }
 
 // UPDATE
@@ -81,16 +102,17 @@ if ($method === 'PUT' && $id) {
         $statut, $datePrevue, $dateReal, $body['commentaire'] ?? $cur['commentaire'], $id,
     ]);
 
-    // Créer une alerte si passage en retard
     if ($statut === 'retard' && $cur['statut'] !== 'retard') {
         $d = $db->prepare('SELECT numero_dossier FROM dossiers WHERE id=?');
         $d->execute([$cur['dossier_id']]);
         $num = $d->fetchColumn();
         $db->prepare('INSERT INTO alertes (dossier_id,etape_id,message,type) VALUES (?,?,?,?)')
            ->execute([$cur['dossier_id'], $id, "Retard sur l'étape \"{$cur['type_etape']}\" du dossier $num", 'critique']);
+        notifyRetard($db, $cur['dossier_id'], $cur['type_etape']);
     }
 
     Auth::auditLog(Auth::userId(), 'UPDATE', 'etapes', $id, 'Mise à jour étape');
+    etapeHistorique($db, $cur['dossier_id'], Auth::userId(), 'Étape mise à jour', "{$cur['type_etape']} → $statut");
     json_response(['ok' => true]);
 }
 
